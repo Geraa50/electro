@@ -48,6 +48,5 @@ win_condition = {
 "tolerance": 0.5
 }
 show_schematic = true
-allow_parameter_editing = true
 time_limit = 0.0
 max_attempts = 0

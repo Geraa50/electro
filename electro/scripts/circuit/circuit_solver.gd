@@ -42,6 +42,9 @@ func solve(graph: CircuitGraph) -> Dictionary:
 		total_resistance = 0.001
 
 	var total_current := source_voltage / total_resistance
+	var max_curr := source.get_max_current()
+	if max_curr > 0.0 and total_current > max_curr:
+		total_current = max_curr
 	result["total_resistance"] = total_resistance
 	result["total_current"] = total_current
 
@@ -142,6 +145,13 @@ func _path_resistance(graph: CircuitGraph, path: Array) -> float:
 func _calculate_component_values(graph: CircuitGraph, result: Dictionary, paths: Array, source_voltage: float, total_current: float) -> void:
 	var comp_data: Dictionary = {}
 
+	var max_curr := 0.0
+	for node_id in graph.nodes:
+		var c: BaseComponent = graph.nodes[node_id].component
+		if c.get_component_type() == "power_source":
+			max_curr = c.get_max_current()
+			break
+
 	for path in paths:
 		var path_r := _path_resistance(graph, path)
 		var path_current: float
@@ -149,6 +159,8 @@ func _calculate_component_values(graph: CircuitGraph, result: Dictionary, paths:
 			path_current = total_current
 		else:
 			path_current = source_voltage / path_r if path_r > 0.0 else 0.0
+			if max_curr > 0.0 and path_current > max_curr:
+				path_current = max_curr
 
 		var counted: Array[BaseComponent] = []
 		for node_id in path:
@@ -172,9 +184,34 @@ func _calculate_component_values(graph: CircuitGraph, result: Dictionary, paths:
 				"resistance": r
 			}
 
+	# Voltammeter shows consumer (load) voltage and total current
+	var consumer_voltage := source_voltage
+	for key in comp_data:
+		var data: Dictionary = comp_data[key]
+		if data["component"].get_component_type() == "consumer":
+			consumer_voltage = data["voltage"]
+			break
+
+	for key in comp_data:
+		var data: Dictionary = comp_data[key]
+		if data["component"].get_component_type() == "voltammeter":
+			data["voltage"] = consumer_voltage
+			data["current"] = total_current
+			data["power"] = consumer_voltage * total_current
+
 	result["components"] = comp_data
 
+	var updated_comps: Array[BaseComponent] = []
 	for key in comp_data:
 		var data: Dictionary = comp_data[key]
 		var comp: BaseComponent = data["component"]
 		comp.update_visual_state(data["current"], data["voltage"])
+		updated_comps.append(comp)
+
+	var seen: Array[BaseComponent] = []
+	for node_id in graph.nodes:
+		var comp: BaseComponent = graph.nodes[node_id].component
+		if comp not in seen:
+			seen.append(comp)
+			if comp not in updated_comps:
+				comp.update_visual_state(0.0, 0.0)

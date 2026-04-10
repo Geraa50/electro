@@ -20,9 +20,6 @@ extends Resource
 ## Whether to show schematic hint
 @export var show_schematic: bool = true
 
-## Whether the player can edit component parameters
-@export var allow_parameter_editing: bool = false
-
 ## Time limit in seconds (0 = no limit)
 @export var time_limit: float = 0.0
 

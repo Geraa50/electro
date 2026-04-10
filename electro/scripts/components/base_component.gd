@@ -3,11 +3,9 @@ extends Node2D
 
 signal placed_on_board(component: BaseComponent)
 signal removed_from_board(component: BaseComponent)
-signal parameter_changed(component: BaseComponent)
 signal pin_clicked(component: BaseComponent, pin_index: int)
 
 @export var is_fixed: bool = false
-@export var is_editable: bool = false
 @export var component_label: String = ""
 
 var pin_positions: Array[Vector2] = []
@@ -46,6 +44,9 @@ func get_required_voltage() -> float:
 	return 0.0
 
 func get_required_power() -> float:
+	return 0.0
+
+func get_max_current() -> float:
 	return 0.0
 
 func get_component_type() -> String:

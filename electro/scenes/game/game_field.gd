@@ -23,6 +23,10 @@ var wire_drawer: WireDrawer = null
 # Connection tracking
 var connections: Array[Dictionary] = []
 
+# Buffer drag state
+var _dragging_from_buffer: bool = false
+var _buffer_drag_comp: BaseComponent = null
+
 @onready var breadboard: Node2D = $Breadboard
 @onready var components_layer: Node2D = $Breadboard/ComponentsLayer
 @onready var wires_layer: Node2D = $Breadboard/WiresLayer
@@ -55,6 +59,44 @@ func _process(delta: float) -> void:
 			timer_active = false
 			GameManager.fail_level()
 
+func _input(event: InputEvent) -> void:
+	if not _dragging_from_buffer or _buffer_drag_comp == null:
+		return
+	if event is InputEventMouseMotion:
+		_buffer_drag_comp.global_position = get_global_mouse_position()
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+			_finish_buffer_drag()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
+			_cancel_buffer_drag()
+			get_viewport().set_input_as_handled()
+
+func _finish_buffer_drag() -> void:
+	if _buffer_drag_comp == null:
+		return
+	var mouse_pos := get_global_mouse_position()
+	var board_local := mouse_pos - breadboard.global_position
+	if board_local.x < 0 or board_local.x > 780 or board_local.y < 0 or board_local.y > 520:
+		_cancel_buffer_drag()
+		return
+	_buffer_drag_comp.position = _buffer_drag_comp.snap_to_grid(_buffer_drag_comp.position)
+	if not _buffer_drag_comp.is_placed:
+		_buffer_drag_comp.place_on_board(_buffer_drag_comp.position)
+	_buffer_drag_comp.z_index = 0
+	_buffer_drag_comp = null
+	_dragging_from_buffer = false
+
+func _cancel_buffer_drag() -> void:
+	if _buffer_drag_comp == null:
+		return
+	placed_components.erase(_buffer_drag_comp)
+	circuit_graph.remove_component(_buffer_drag_comp)
+	_buffer_drag_comp.queue_free()
+	_buffer_drag_comp = null
+	_dragging_from_buffer = false
+
 # ── Level loading ──
 
 func _load_current_level() -> void:
@@ -70,6 +112,10 @@ func _load_current_level() -> void:
 		level_data.hint_text = "Соедините компоненты проводами, чтобы замкнуть цепь"
 
 	level_label.text = level_data.level_name
+	if not level_data.win_condition.is_empty():
+		var target_val := float(level_data.win_condition.get("target_value", 0))
+		var tol := float(level_data.win_condition.get("tolerance", 0))
+		level_label.text += "   |   Цель: " + str(target_val) + " В на нагрузке (±" + str(tol) + " В)"
 	hint_label.text = level_data.hint_text
 
 	if level_data.time_limit > 0:
@@ -113,13 +159,21 @@ func _populate_buffer() -> void:
 	for child in buffer_items.get_children():
 		child.queue_free()
 
+	var seen: Dictionary = {}
 	for comp_info in level_data.available_components:
 		var type_name: String = comp_info.get("type", "")
 		var params: Dictionary = comp_info.get("params", {})
+		var key := type_name + str(params)
+		if key in seen:
+			continue
+		seen[key] = true
 		var btn := Button.new()
-		btn.text = _get_component_display_name(type_name)
+		var display := _get_component_display_name(type_name)
+		if type_name == "resistor" and params.has("resistance"):
+			display += " (" + str(params["resistance"]) + "Ω)"
+		btn.text = display
 		btn.custom_minimum_size = Vector2(280, 50)
-		btn.pressed.connect(_on_buffer_item_pressed.bind(type_name, params))
+		btn.button_down.connect(_on_buffer_item_drag_start.bind(type_name, params))
 		buffer_items.add_child(btn)
 
 func _create_component(type_name: String, params: Dictionary) -> BaseComponent:
@@ -156,8 +210,6 @@ func _create_component(type_name: String, params: Dictionary) -> BaseComponent:
 			push_warning("Unknown component type: " + type_name)
 			return null
 
-	if comp != null:
-		comp.is_editable = level_data.allow_parameter_editing
 	return comp
 
 func _get_component_display_name(type_name: String) -> String:
@@ -171,19 +223,21 @@ func _get_component_display_name(type_name: String) -> String:
 		"wire": return "─ Провод"
 	return type_name
 
-func _on_buffer_item_pressed(type_name: String, params: Dictionary) -> void:
+func _on_buffer_item_drag_start(type_name: String, params: Dictionary) -> void:
 	var comp := _create_component(type_name, params)
 	if comp == null:
 		return
-	comp.position = Vector2(GRID_SIZE * 2, GRID_SIZE * 2)
 	components_layer.add_child(comp)
+	comp.global_position = get_global_mouse_position()
 	placed_components.append(comp)
 	circuit_graph.add_component(comp)
 	_connect_component_signals(comp)
+	comp.z_index = 100
+	_buffer_drag_comp = comp
+	_dragging_from_buffer = true
 
 func _connect_component_signals(comp: BaseComponent) -> void:
 	comp.pin_clicked.connect(_on_pin_clicked)
-	comp.parameter_changed.connect(_on_parameter_changed)
 	if comp is WireComponent:
 		comp.pin_drag_ended.connect(_on_wire_pin_drag_ended)
 
@@ -371,9 +425,6 @@ func _point_to_segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 # ── Circuit ──
 
-func _on_parameter_changed(_component: BaseComponent) -> void:
-	_recalculate_circuit()
-
 func _recalculate_circuit() -> Dictionary:
 	return circuit_graph.solve()
 
@@ -433,6 +484,10 @@ func _show_feedback(result: Dictionary) -> void:
 		var voltage: float = result.get("source_voltage", 0.0)
 		hint_label.text = "Цепь замкнута. Ток: %.2f А, Напряжение: %.2f В\nНо условие победы не выполнено." % [current, voltage]
 	hint_panel.visible = true
+
+func _on_debug_auto_complete() -> void:
+	GameManager.complete_level()
+	get_tree().change_scene_to_file("res://scenes/level_complete/level_complete.tscn")
 
 func _update_timer_display() -> void:
 	var minutes := int(time_remaining) / 60

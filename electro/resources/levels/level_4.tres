@@ -6,7 +6,7 @@
 script = ExtResource("1")
 level_name = "Уровень 4: Без подсказок"
 level_description = "Соберите цепь самостоятельно, без схемы. Лампа должна получить 7В."
-hint_text = ""
+hint_text = "Лампе нужно 7В. Подберите резисторы, чтобы получить нужное напряжение на нагрузке."
 fixed_components = [{
 "type": "power_source",
 "position": "Vector2(128, 128)",
@@ -64,6 +64,5 @@ win_condition = {
 "tolerance": 1.0
 }
 show_schematic = false
-allow_parameter_editing = false
 time_limit = 0.0
 max_attempts = 0

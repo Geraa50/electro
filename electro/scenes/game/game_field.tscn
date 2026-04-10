@@ -103,6 +103,14 @@ theme_override_font_sizes/font_size = 24
 text = "00:00"
 horizontal_alignment = 1
 
+[node name="DebugAutoComplete" type="Button" parent="UILayer"]
+offset_left = 1100.0
+offset_top = 10.0
+offset_right = 1270.0
+offset_bottom = 45.0
+text = "⚙ АВТО"
+
+[connection signal="pressed" from="UILayer/DebugAutoComplete" to="." method="_on_debug_auto_complete"]
 [connection signal="pressed" from="UILayer/TopPanel/BackButton" to="." method="_on_back_pressed"]
 [connection signal="pressed" from="UILayer/TopPanel/HintButton" to="." method="_on_hint_pressed"]
 [connection signal="pressed" from="UILayer/TopPanel/CheckButton" to="." method="_on_check_pressed"]

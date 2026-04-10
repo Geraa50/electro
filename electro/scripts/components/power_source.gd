@@ -24,6 +24,9 @@ func get_voltage() -> float:
 		return voltage
 	return 0.0
 
+func get_max_current() -> float:
+	return max_current
+
 func get_resistance() -> float:
 	return 0.001
 
