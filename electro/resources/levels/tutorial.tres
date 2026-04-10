@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Туториал"
+level_description = "Научитесь собирать простейшую электрическую цепь. Перетащите компоненты на плату и соедините проводами."
+hint_text = "Добавьте провода из меню справа. Перетащите конец провода к пину компонента — он подключится автоматически. Соедините (+) батареи с лампой, а лампу обратно к (−) батареи."
+fixed_components = [{
+"type": "power_source",
+"position": "Vector2(192, 128)",
+"params": {
+"voltage": 9.0,
+"max_current": 2.0
+}
+}, {
+"type": "consumer",
+"position": "Vector2(448, 384)",
+"params": {
+"required_voltage": 9.0,
+"required_power": 5.0,
+"name": "Лампа",
+"resistance": 16.0
+}
+}]
+available_components = [{
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "switch",
+"params": {}
+}]
+win_condition = {
+"type": "voltage",
+"target_value": 9.0,
+"tolerance": 1.5
+}
+show_schematic = true
+allow_parameter_editing = false
+time_limit = 0.0
+max_attempts = 0

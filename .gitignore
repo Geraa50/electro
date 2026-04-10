@@ -1,0 +1,28 @@
+# Godot 4+ specific ignores
+.godot/
+
+# Godot-specific ignores
+*.translation
+
+# Imported textures, meshes, etc.
+.import/
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# Export presets (may contain sensitive data)
+# export_presets.cfg
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Agent transcripts
+agent-transcripts/

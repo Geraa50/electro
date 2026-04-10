@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Уровень 2: Параллельное соединение"
+level_description = "Соберите цепь с параллельным соединением резисторов."
+hint_text = "При параллельном соединении: 1/R = 1/R1 + 1/R2. Общее сопротивление всегда меньше наименьшего из резисторов. Соедините резисторы параллельно для получения нужного тока."
+fixed_components = [{
+"type": "power_source",
+"position": "Vector2(128, 128)",
+"params": {
+"voltage": 12.0,
+"max_current": 5.0
+}
+}, {
+"type": "consumer",
+"position": "Vector2(576, 384)",
+"params": {
+"required_voltage": 12.0,
+"required_power": 12.0,
+"name": "Лампа",
+"resistance": 12.0
+}
+}]
+available_components = [{
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "resistor",
+"params": {
+"resistance": 20.0
+}
+}, {
+"type": "resistor",
+"params": {
+"resistance": 30.0
+}
+}, {
+"type": "switch",
+"params": {}
+}, {
+"type": "voltammeter",
+"params": {}
+}]
+win_condition = {
+"type": "voltage",
+"target_value": 12.0,
+"tolerance": 2.0
+}
+show_schematic = true
+allow_parameter_editing = false
+time_limit = 0.0
+max_attempts = 0

@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Уровень 6: На время!"
+level_description = "Аварийная ситуация! Подключите резервный генератор за 120 секунд!"
+hint_text = "Быстро соберите цепь! Генератору нужно подать 9В на аварийное освещение."
+fixed_components = [{
+"type": "power_source",
+"position": "Vector2(128, 128)",
+"params": {
+"voltage": 18.0,
+"max_current": 4.0
+}
+}, {
+"type": "consumer",
+"position": "Vector2(576, 384)",
+"params": {
+"required_voltage": 9.0,
+"required_power": 6.0,
+"name": "Авар. свет",
+"resistance": 13.5
+}
+}]
+available_components = [{
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "wire",
+"params": {}
+}, {
+"type": "resistor",
+"params": {
+"resistance": 10.0
+}
+}, {
+"type": "resistor",
+"params": {
+"resistance": 15.0
+}
+}, {
+"type": "switch",
+"params": {}
+}]
+win_condition = {
+"type": "voltage",
+"target_value": 9.0,
+"tolerance": 1.5
+}
+show_schematic = false
+allow_parameter_editing = false
+time_limit = 120.0
+max_attempts = 0

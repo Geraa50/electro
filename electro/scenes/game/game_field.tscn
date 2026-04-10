@@ -1,0 +1,108 @@
+[gd_scene load_steps=2 format=3 uid="uid://bl3bq8sdpgvvy"]
+
+[ext_resource type="Script" uid="uid://cgo4e3dtk51ep" path="res://scenes/game/game_field.gd" id="1"]
+
+[node name="GameField" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.18, 0.16, 0.14, 1)
+
+[node name="Breadboard" type="Node2D" parent="."]
+position = Vector2(100, 80)
+
+[node name="BreadboardBG" type="ColorRect" parent="Breadboard"]
+offset_right = 780.0
+offset_bottom = 520.0
+color = Color(0.85, 0.82, 0.75, 1)
+
+[node name="GridOverlay" type="Node2D" parent="Breadboard"]
+
+[node name="ComponentsLayer" type="Node2D" parent="Breadboard"]
+
+[node name="WiresLayer" type="Node2D" parent="Breadboard"]
+
+[node name="ComponentBuffer" type="Node2D" parent="."]
+position = Vector2(920, 80)
+
+[node name="BufferBG" type="ColorRect" parent="ComponentBuffer"]
+offset_right = 320.0
+offset_bottom = 520.0
+color = Color(0.45, 0.32, 0.18, 1)
+
+[node name="BufferLabel" type="Label" parent="ComponentBuffer"]
+offset_left = 10.0
+offset_top = 5.0
+offset_right = 310.0
+offset_bottom = 30.0
+text = "КОМПОНЕНТЫ"
+horizontal_alignment = 1
+
+[node name="BufferItems" type="VBoxContainer" parent="ComponentBuffer"]
+offset_left = 10.0
+offset_top = 40.0
+offset_right = 310.0
+offset_bottom = 510.0
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="TopPanel" type="HBoxContainer" parent="UILayer"]
+offset_left = 10.0
+offset_top = 620.0
+offset_right = 1270.0
+offset_bottom = 710.0
+
+[node name="BackButton" type="Button" parent="UILayer/TopPanel"]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+text = "← МЕНЮ"
+
+[node name="LevelLabel" type="Label" parent="UILayer/TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Уровень: Туториал"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HintButton" type="Button" parent="UILayer/TopPanel"]
+custom_minimum_size = Vector2(120, 50)
+layout_mode = 2
+text = "ПОДСКАЗКА"
+
+[node name="CheckButton" type="Button" parent="UILayer/TopPanel"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+text = "✓ ПРОВЕРИТЬ"
+
+[node name="HintPanel" type="PanelContainer" parent="UILayer"]
+visible = false
+offset_left = 200.0
+offset_top = 200.0
+offset_right = 1080.0
+offset_bottom = 520.0
+
+[node name="HintLabel" type="Label" parent="UILayer/HintPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Подсказка появится здесь"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="TimerLabel" type="Label" parent="UILayer"]
+visible = false
+offset_left = 560.0
+offset_top = 10.0
+offset_right = 720.0
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 24
+text = "00:00"
+horizontal_alignment = 1
+
+[connection signal="pressed" from="UILayer/TopPanel/BackButton" to="." method="_on_back_pressed"]
+[connection signal="pressed" from="UILayer/TopPanel/HintButton" to="." method="_on_hint_pressed"]
+[connection signal="pressed" from="UILayer/TopPanel/CheckButton" to="." method="_on_check_pressed"]
