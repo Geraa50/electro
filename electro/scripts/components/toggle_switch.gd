@@ -26,7 +26,6 @@ func is_conducting() -> bool:
 
 func toggle() -> void:
 	active_output = 1 - active_output
-	parameter_changed.emit(self)
 	queue_redraw()
 
 func _on_body_clicked() -> void:
