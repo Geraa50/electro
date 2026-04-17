@@ -63,10 +63,6 @@ func _draw() -> void:
 	draw_circle(Vector2(14, -14), 4.0, color_a)
 	draw_circle(Vector2(14, 14), 4.0, color_b)
 
-	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(16, -16), "A", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color_a)
-	draw_string(font, Vector2(16, 22), "B", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color_b)
-
 	for i in range(pin_positions.size()):
 		var c := Color(0.1, 0.1, 0.1)
 		if i in connected_pins:
@@ -76,5 +72,9 @@ func _draw() -> void:
 		elif i == 2 and active_output == 1:
 			c = ACTIVE_COLOR
 		draw_circle(pin_positions[i], PIN_RADIUS, c)
+
+	var status := "A" if active_output == 0 else "B"
+	draw_world_text(Vector2(0, BODY_SIZE.y * 0.5 + 14), "Ветка: " + status, 11,
+		ACTIVE_COLOR)
 
 	_draw_selection_indicator()

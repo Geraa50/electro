@@ -55,11 +55,11 @@ func _draw() -> void:
 		lever_end = Vector2(4, -BODY_SIZE.y * 0.5 + 4)
 	draw_line(Vector2(-BODY_SIZE.x * 0.5 + 10, 0), lever_end, body_color, 3.0)
 
-	var status := "ВКЛ" if is_closed else "ВЫКЛ"
-	draw_string(ThemeDB.fallback_font, Vector2(-16, BODY_SIZE.y * 0.5 + 14), status, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, body_color)
-
 	for i in range(pin_positions.size()):
 		var col := PIN_CONNECTED_COLOR if i in connected_pins else Color(0.1, 0.1, 0.1)
 		draw_circle(pin_positions[i], PIN_RADIUS, col)
+
+	var status := "ВКЛ" if is_closed else "ВЫКЛ"
+	draw_world_text(Vector2(0, BODY_SIZE.y * 0.5 + 14), status, 11, body_color)
 
 	_draw_selection_indicator()

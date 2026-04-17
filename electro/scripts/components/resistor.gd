@@ -31,12 +31,12 @@ func _draw() -> void:
 	draw_rect(body_rect, FILL_COLOR, true)
 	draw_rect(body_rect, BORDER_COLOR, false, 2.0)
 
-	var r_text := _format_resistance(resistance)
-	draw_string(ThemeDB.fallback_font, Vector2(-22, BODY_SIZE.y * 0.5 + 14), r_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, LABEL_COLOR)
-
 	for i in range(pin_positions.size()):
 		var col := PIN_CONNECTED_COLOR if i in connected_pins else Color(0.1, 0.1, 0.1)
 		draw_circle(pin_positions[i], PIN_RADIUS, col)
+
+	var r_text := _format_resistance(resistance)
+	draw_world_text(Vector2(0, BODY_SIZE.y * 0.5 + 12), r_text, 12, LABEL_COLOR)
 
 	_draw_selection_indicator()
 

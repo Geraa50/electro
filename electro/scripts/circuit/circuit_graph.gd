@@ -102,8 +102,12 @@ func solve() -> Dictionary:
 				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0:
 					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": maxf(comp.get_resistance(), 0.0001)})
 			"voltammeter":
+				## В режиме V (вольтметр) внутреннее сопротивление огромное —
+				## прибор практически не влияет на цепь. В режиме A (амперметр)
+				## сопротивление почти нулевое — прибор ведёт себя как провод,
+				## и через него идёт реальный ток ветки.
 				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0:
-					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": 0.001})
+					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": maxf(comp.get_resistance(), 0.0001)})
 			"switch":
 				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0 and comp.is_conducting():
 					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": 0.001})
@@ -178,6 +182,99 @@ func solve() -> Dictionary:
 	for comp in pin_buses:
 		if comp.get_instance_id() not in comp_data and is_instance_valid(comp):
 			comp.update_visual_state(0.0, 0.0)
+
+	## Показания вольт-амперметров.
+	##   I — реальный ток через прибор (MNA уже решён с учётом его R).
+	##   U — разность потенциалов между его двумя щупами (как у настоящего
+	##       вольтметра, поставленного параллельно измеряемому участку).
+	##
+	## Если ни один источник в данный момент не запитан, живых показаний
+	## нет — НО мы не затираем последние значения на дисплее, чтобы
+	## пользователь мог прочитать их после того, как источник отключился
+	## (например, после неудачной попытки уровня).
+	var has_live_source: bool = not sources.is_empty()
+	if has_live_source:
+		for vcomp in pin_buses:
+			if not is_instance_valid(vcomp):
+				continue
+			if vcomp.get_component_type() != "voltammeter":
+				continue
+			var vpins: Array = pin_buses[vcomp]
+			if vpins.size() < 2 or vpins[0] < 0 or vpins[1] < 0:
+				## Хотя бы один щуп в воздухе — измерения нет.
+				vcomp.set_measurement(0.0, 0.0)
+				continue
+
+			var v_sa: int = uf.find(vpins[0])
+			var v_sb: int = uf.find(vpins[1])
+			var v_a: float = mna["v_of_supernode"].get(v_sa, 0.0)
+			var v_b: float = mna["v_of_supernode"].get(v_sb, 0.0)
+			var self_i: float = absf(mna["i_of_component"].get(vcomp.get_instance_id(), 0.0))
+			var u: float = absf(v_a - v_b)
+			vcomp.set_measurement(u, self_i)
+
+	## Подсветка проводов. Аналогия «вода в трубе»: как только включён
+	## источник, давление передаётся на ВСЕ электрически соединённые с ним
+	## провода — даже если цепь не замкнута и ток реально не течёт.
+	##
+	## Алгоритм: BFS по супернодам, сосчитая сопротивления и источники как
+	## рёбра графа. Стартовые узлы — клеммы каждого активного источника.
+	var pressurized: Dictionary = {}
+	if not sources.is_empty():
+		var adj: Dictionary = {}
+		for r in resistors:
+			var ra: int = r["a"]
+			var rb: int = r["b"]
+			if not adj.has(ra):
+				adj[ra] = []
+			if not adj.has(rb):
+				adj[rb] = []
+			adj[ra].append(rb)
+			adj[rb].append(ra)
+		for s in sources:
+			var sp: int = s["p"]
+			var sn: int = s["n"]
+			if not adj.has(sp):
+				adj[sp] = []
+			if not adj.has(sn):
+				adj[sn] = []
+			adj[sp].append(sn)
+			adj[sn].append(sp)
+
+		var queue: Array = []
+		for s in sources:
+			if not pressurized.has(s["p"]):
+				pressurized[s["p"]] = true
+				queue.append(s["p"])
+			if not pressurized.has(s["n"]):
+				pressurized[s["n"]] = true
+				queue.append(s["n"])
+
+		while not queue.is_empty():
+			var cur: int = queue.pop_front()
+			for nxt in adj.get(cur, []):
+				if not pressurized.has(nxt):
+					pressurized[nxt] = true
+					queue.append(nxt)
+
+	for wcomp in pin_buses:
+		if not is_instance_valid(wcomp):
+			continue
+		if wcomp.get_component_type() != "wire":
+			continue
+		var wpins: Array = pin_buses[wcomp]
+		var active := false
+		## Достаточно, чтобы ХОТЯ БЫ ОДИН конец провода был воткнут в
+		## клемму «под давлением». Второй конец может висеть в воздухе —
+		## провод всё равно синеет, как труба, у которой открыт только
+		## один кран.
+		for wp in wpins:
+			if wp < 0:
+				continue
+			if pressurized.has(uf.find(wp)):
+				active = true
+				break
+		wcomp.update_visual_state(1.0 if active else 0.0, 0.0)
 
 	result["components"] = comp_data
 	last_result = result

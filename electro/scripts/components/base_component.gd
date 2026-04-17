@@ -5,6 +5,7 @@ signal placed_on_board(component: BaseComponent)
 signal removed_from_board(component: BaseComponent)
 signal pin_clicked(component: BaseComponent, pin_index: int)
 signal body_clicked(component: BaseComponent)
+signal body_double_clicked(component: BaseComponent)
 signal rotated(component: BaseComponent)
 
 @export var is_fixed: bool = false
@@ -20,6 +21,7 @@ var original_position: Vector2 = Vector2.ZERO
 var connected_pins: Dictionary = {}
 var _press_global_pos: Vector2 = Vector2.ZERO
 var is_selected: bool = false
+var _last_double_click_frame: int = -1
 
 const PIN_RADIUS := 6.0
 const PIN_COLOR := Color(0.25, 0.25, 0.25)
@@ -125,6 +127,19 @@ func _draw_selection_indicator() -> void:
 func _get_bounding_rect() -> Rect2:
 	return Rect2(Vector2(-32, -32), Vector2(64, 64))
 
+## Draw text that stays world-oriented (does NOT rotate with the component).
+## world_offset is the desired pixel offset from the component origin in WORLD
+## (un-rotated) coordinates: e.g. Vector2(0, 40) always appears "below" the
+## component, regardless of its rotation.
+func draw_world_text(world_offset: Vector2, text: String, font_size: int = 12,
+		color: Color = Color(0.1, 0.1, 0.1), max_width: float = 180.0,
+		align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER) -> void:
+	var local_anchor := world_offset.rotated(-rotation)
+	draw_set_transform(local_anchor, -rotation, Vector2.ONE)
+	var font := ThemeDB.fallback_font
+	draw_string(font, Vector2(-max_width * 0.5, 0), text, align, max_width, font_size, color)
+	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+
 func _draw() -> void:
 	for i in range(pin_positions.size()):
 		var col := PIN_CONNECTED_COLOR if i in connected_pins else PIN_COLOR
@@ -137,7 +152,10 @@ func _input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
-				_handle_press()
+				if mb.double_click:
+					_handle_double_tap()
+				else:
+					_handle_press()
 			else:
 				_handle_release()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed and is_selected and not is_fixed:
@@ -157,8 +175,12 @@ func _input(event: InputEvent) -> void:
 		global_position = get_global_mouse_position() - drag_offset
 
 	if event is InputEventScreenTouch:
-		if event.pressed:
-			_handle_press()
+		var st := event as InputEventScreenTouch
+		if st.pressed:
+			if st.double_tap:
+				_handle_double_tap()
+			else:
+				_handle_press()
 		else:
 			_handle_release()
 
@@ -199,6 +221,25 @@ func _handle_release() -> void:
 		_on_body_clicked()
 	else:
 		placed_on_board.emit(self)
+	get_viewport().set_input_as_handled()
+
+func _handle_double_tap() -> void:
+	var mouse_global := get_global_mouse_position()
+	var local_pos := to_local(mouse_global)
+	if not _is_point_inside(local_pos):
+		return
+	## De-dupe events that arrive both as mouse + emulated touch in the same frame.
+	var frame := Engine.get_process_frames()
+	if frame == _last_double_click_frame:
+		get_viewport().set_input_as_handled()
+		return
+	_last_double_click_frame = frame
+	## Cancel any half-started drag so we don't leave the component floating.
+	if is_dragging:
+		is_dragging = false
+		z_index = 0
+		position = original_position
+	body_double_clicked.emit(self)
 	get_viewport().set_input_as_handled()
 
 func _on_body_clicked() -> void:

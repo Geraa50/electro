@@ -4,9 +4,12 @@ extends BaseComponent
 signal pin_drag_ended(wire: WireComponent, pin_index: int)
 signal body_drag_ended(wire: WireComponent)
 
-const WIRE_COLOR := Color(0.15, 0.15, 0.15)
-const WIRE_ACTIVE_COLOR := Color(0.15, 0.75, 0.25)
+const WIRE_COLOR := Color(0.18, 0.18, 0.18)
+## Тёмно-синий с высокой насыщенностью — хорошо видно на бежевой макетке.
+const WIRE_ACTIVE_COLOR := Color(0.10, 0.35, 1.00)
+const WIRE_ACTIVE_GLOW := Color(0.30, 0.55, 1.00, 0.45)
 const WIRE_WIDTH := 4.0
+const WIRE_ACTIVE_WIDTH := 6.0
 const WIRE_DEFAULT_LENGTH := 80.0
 
 var is_active: bool = false
@@ -50,17 +53,31 @@ func _is_point_inside(local_pos: Vector2) -> bool:
 	return local_pos.distance_to(proj) <= 12.0
 
 func _draw() -> void:
-	var color := WIRE_ACTIVE_COLOR if is_active else WIRE_COLOR
-	draw_line(pin_positions[0], pin_positions[1], color, WIRE_WIDTH)
+	if is_active:
+		## Подсвечиваем более широким полупрозрачным «свечением» снизу, а
+		## поверх — основной синей линией.
+		draw_line(pin_positions[0], pin_positions[1], WIRE_ACTIVE_GLOW, WIRE_ACTIVE_WIDTH + 4.0)
+		draw_line(pin_positions[0], pin_positions[1], WIRE_ACTIVE_COLOR, WIRE_ACTIVE_WIDTH)
+	else:
+		draw_line(pin_positions[0], pin_positions[1], WIRE_COLOR, WIRE_WIDTH)
 
 	for i in range(pin_positions.size()):
-		var pin_color := PIN_CONNECTED_COLOR if i in connected_pins else Color(0.9, 0.6, 0.1)
+		var pin_color: Color
+		if is_active:
+			pin_color = WIRE_ACTIVE_COLOR
+		elif i in connected_pins:
+			pin_color = PIN_CONNECTED_COLOR
+		else:
+			pin_color = Color(0.9, 0.6, 0.1)
 		draw_circle(pin_positions[i], PIN_RADIUS, pin_color)
 
 	_draw_selection_indicator()
 
 func update_visual_state(current: float, _voltage: float) -> void:
-	is_active = current > 0.001
+	var new_state: bool = current > 0.0005
+	if new_state == is_active:
+		return
+	is_active = new_state
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -68,7 +85,10 @@ func _input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
-				_wire_press()
+				if mb.double_click:
+					_handle_double_tap()
+				else:
+					_wire_press()
 			else:
 				_wire_release()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed and is_selected and not is_fixed:
@@ -93,8 +113,12 @@ func _input(event: InputEvent) -> void:
 			global_position = get_global_mouse_position() - drag_offset
 
 	if event is InputEventScreenTouch:
-		if event.pressed:
-			_wire_press()
+		var st := event as InputEventScreenTouch
+		if st.pressed:
+			if st.double_tap:
+				_handle_double_tap()
+			else:
+				_wire_press()
 		else:
 			_wire_release()
 
@@ -105,6 +129,12 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif is_dragging and not is_fixed:
 			global_position = get_global_mouse_position() - drag_offset
+
+func _handle_double_tap() -> void:
+	if dragging_pin >= 0:
+		dragging_pin = -1
+		queue_redraw()
+	super._handle_double_tap()
 
 func _wire_press() -> void:
 	var mouse_global := get_global_mouse_position()

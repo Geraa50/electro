@@ -8,6 +8,7 @@ signal power_toggled(source: PowerSource, is_on: bool)
 var is_on: bool = false
 var is_cooldown: bool = false
 var cooldown_remaining: float = 0.0
+var last_current: float = 0.0
 
 const BODY_SIZE := Vector2(80, 48)
 const POSITIVE_COLOR := Color(0.85, 0.15, 0.15)
@@ -41,6 +42,8 @@ func set_on(v: bool) -> void:
 	if is_on == v:
 		return
 	is_on = v
+	if not v:
+		last_current = 0.0
 	queue_redraw()
 	power_toggled.emit(self, v)
 
@@ -76,12 +79,11 @@ func _draw() -> void:
 	draw_rect(Rect2(-BODY_SIZE.x / 2 - 10, -10, 10, 20), POSITIVE_COLOR, true)
 	draw_rect(Rect2(BODY_SIZE.x / 2, -10, 10, 20), NEGATIVE_COLOR, true)
 
-	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(-BODY_SIZE.x / 2 + 4, -6), "+", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
-	draw_string(font, Vector2(BODY_SIZE.x / 2 - 14, -6), "−", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
-
-	var v_text := "%.1f В" % voltage
-	draw_string(font, Vector2(-20, 10), v_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color.WHITE)
+	for i in range(pin_positions.size()):
+		var c := POSITIVE_COLOR if i == 0 else NEGATIVE_COLOR
+		draw_circle(pin_positions[i], PIN_RADIUS, c)
+		if i in connected_pins:
+			draw_arc(pin_positions[i], PIN_RADIUS + 3.0, 0, TAU, 20, PIN_CONNECTED_COLOR, 2.0)
 
 	var status: String
 	if is_cooldown:
@@ -90,15 +92,16 @@ func _draw() -> void:
 		status = "ON"
 	else:
 		status = "OFF"
-	draw_string(font, Vector2(-20, BODY_SIZE.y / 2 + 14), status, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color.WHITE if is_on else Color(0.85, 0.85, 0.85))
 
-	for i in range(pin_positions.size()):
-		var c := POSITIVE_COLOR if i == 0 else NEGATIVE_COLOR
-		draw_circle(pin_positions[i], PIN_RADIUS, c)
-		if i in connected_pins:
-			draw_arc(pin_positions[i], PIN_RADIUS + 3.0, 0, TAU, 20, PIN_CONNECTED_COLOR, 2.0)
+	draw_world_text(Vector2(0, -BODY_SIZE.y * 0.5 - 14), "+ / −", 12, Color.WHITE)
+	draw_world_text(Vector2(0, -2), "%.1f В" % voltage, 14, Color.WHITE)
+	draw_world_text(Vector2(0, BODY_SIZE.y * 0.5 + 14), status, 12,
+		Color.WHITE if is_on else Color(0.85, 0.85, 0.85))
+	draw_world_text(Vector2(0, BODY_SIZE.y * 0.5 + 30), "I: %.2f А" % last_current, 11,
+		Color(0.8, 0.9, 1.0))
 
 	_draw_selection_indicator()
 
-func update_visual_state(_current: float, _voltage: float) -> void:
+func update_visual_state(current: float, _voltage: float) -> void:
+	last_current = current
 	queue_redraw()

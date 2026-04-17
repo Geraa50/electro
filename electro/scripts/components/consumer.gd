@@ -51,18 +51,20 @@ func _draw() -> void:
 	draw_line(Vector2(-8, 8), Vector2(0, -8), fil_col, 2.0)
 	draw_line(Vector2(0, -8), Vector2(8, 8), fil_col, 2.0)
 
-	var font := ThemeDB.fallback_font
-	var status_text := consumer_name
-	if is_powered:
-		status_text += " ✓"
-	draw_string(font, Vector2(-30, BODY_RADIUS + 16), status_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color(0.1, 0.1, 0.1))
-
-	var v_text := "%.1f / %.1f В" % [current_voltage, required_voltage]
-	draw_string(font, Vector2(-34, BODY_RADIUS + 32), v_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(0.25, 0.25, 0.25))
-
 	for i in range(pin_positions.size()):
 		var c := PIN_CONNECTED_COLOR if i in connected_pins else Color(0.1, 0.1, 0.1)
 		draw_circle(pin_positions[i], PIN_RADIUS, c)
+
+	var name_text := consumer_name
+	if is_powered:
+		name_text += " ✓"
+	draw_world_text(Vector2(0, BODY_RADIUS + 16), name_text, 12, Color(0.1, 0.1, 0.1))
+
+	var v_text := "%.1f / %.1f В" % [current_voltage, required_voltage]
+	draw_world_text(Vector2(0, BODY_RADIUS + 32), v_text, 11, Color(0.25, 0.25, 0.25))
+
+	var i_text := "I: %.2f А" % current_current
+	draw_world_text(Vector2(0, BODY_RADIUS + 46), i_text, 11, Color(0.25, 0.25, 0.35))
 
 	_draw_selection_indicator()
 
@@ -70,6 +72,8 @@ func update_visual_state(current: float, voltage: float) -> void:
 	current_voltage = voltage
 	current_current = current
 	current_power = voltage * current
+	## Lamp lights up based solely on its OWN voltage — independent from the rest
+	## of the circuit or other consumers.
 	var voltage_ok: bool = absf(voltage - required_voltage) <= maxf(required_voltage * 0.15, 0.5)
 	is_powered = voltage_ok and current > 0.001
 	queue_redraw()

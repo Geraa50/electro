@@ -1,6 +1,16 @@
 extends Node2D
 
 const POWER_COOLDOWN_SECONDS := 5.0
+const WIN_TRANSITION_DELAY := 2.6
+## Столько секунд источник остаётся включённым перед проверкой: даёт
+## пользователю время снять показания с вольт-амперметра.
+const OBSERVATION_DELAY := 2.0
+
+## 5 кликов в верхнем левом углу экрана за короткое время — авто-прохождение
+## уровня (чит-код для отладки / прохождения сложных уровней).
+const CHEAT_CORNER := Rect2(0, 0, 60, 60)
+const CHEAT_CLICKS_NEEDED := 5
+const CHEAT_WINDOW_SECONDS := 4.0
 
 var level_data: LevelData
 var circuit_graph: CircuitGraph
@@ -10,6 +20,11 @@ var consumer_targets: Array[float] = []
 
 var _dragging_from_buffer: bool = false
 var _buffer_drag_comp: BaseComponent = null
+var _buffer_slots: Array[Dictionary] = []
+var _evaluating: bool = false
+
+var _cheat_clicks: int = 0
+var _cheat_last_time: float = 0.0
 
 @onready var breadboard: Breadboard = $BoardArea/Breadboard
 @onready var components_layer: Node2D = $BoardArea/ComponentsLayer
@@ -36,20 +51,59 @@ func _input(event: InputEvent) -> void:
 	if _dragging_from_buffer and _buffer_drag_comp != null:
 		if event is InputEventMouseMotion:
 			_buffer_drag_comp.global_position = get_global_mouse_position()
+		elif event is InputEventScreenDrag:
+			_buffer_drag_comp.global_position = (event as InputEventScreenDrag).position
 		elif event is InputEventMouseButton:
 			var mb := event as InputEventMouseButton
 			if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
 				_finish_buffer_drag()
-			elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
-				_cancel_buffer_drag()
-				get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton:
+		elif event is InputEventScreenTouch:
+			var st := event as InputEventScreenTouch
+			if not st.pressed:
+				_finish_buffer_drag()
+
+func _unhandled_input(event: InputEvent) -> void:
+	## Клики по верхнему левому углу экрана — счётчик для чит-кода.
+	## Сюда попадают только те нажатия, которые не были перехвачены
+	## UI-элементами (например, кнопкой «МЕНЮ»).
+	var pos: Vector2
+	var is_press := false
+	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-			var comp := _find_component_at(get_global_mouse_position())
-			if comp != null and not comp.is_fixed and not comp.is_essential:
-				_remove_component(comp)
-				get_viewport().set_input_as_handled()
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not mb.double_click:
+			pos = mb.position
+			is_press = true
+	elif event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		if st.pressed and not st.double_tap:
+			pos = st.position
+			is_press = true
+	if not is_press:
+		return
+	if not CHEAT_CORNER.has_point(pos):
+		return
+
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now - _cheat_last_time > CHEAT_WINDOW_SECONDS:
+		_cheat_clicks = 0
+	_cheat_last_time = now
+	_cheat_clicks += 1
+
+	var left: int = CHEAT_CLICKS_NEEDED - _cheat_clicks
+	if _cheat_clicks >= CHEAT_CLICKS_NEEDED:
+		_cheat_clicks = 0
+		_auto_complete_level()
+	else:
+		status_label.text = "🛠 Чит: осталось %d нажатий" % left
+
+func _auto_complete_level() -> void:
+	if _evaluating:
+		return
+	_evaluating = true
+	status_label.text = "🛠 Чит активирован — уровень пройден!"
+	await get_tree().create_timer(0.4).timeout
+	GameManager.complete_level()
+	get_tree().change_scene_to_file("res://scenes/level_complete/level_complete.tscn")
 
 func _load_current_level() -> void:
 	var level_index := GameManager.current_level_index
@@ -65,82 +119,86 @@ func _load_current_level() -> void:
 	level_label.text = level_data.level_name
 	hint_label.text = level_data.hint
 
-	_spawn_fixed_components()
+	consumer_targets.clear()
+	for v in level_data.goal_voltages:
+		consumer_targets.append(v)
+
 	_populate_buffer()
 	_update_status_default()
 
-func _spawn_fixed_components() -> void:
-	var board_size := breadboard.get_board_size()
-	var ps_count: int = level_data.power_count
-	var goal_count: int = level_data.goal_count
-	consumer_targets.clear()
-
-	var spacing_y: float = board_size.y / float(ps_count + 1)
-	for i in range(ps_count):
-		var ps := _make_component("power_source", {
-			"voltage": level_data.power_voltages[i],
-			"max_current": 5.0
-		}) as PowerSource
-		ps.is_fixed = false
-		ps.is_essential = true
-		_add_component_to_scene(ps, true)
-		ps.global_position = breadboard.snap_global_to_cell(breadboard.to_global(Vector2(
-			Breadboard.PIN_SPACING * 3.0,
-			spacing_y * (i + 1)
-		)))
-		_snap_component_to_board(ps)
-
-	var goal_spacing: float = board_size.y / float(goal_count + 1)
-	for i in range(goal_count):
-		var gv: float = level_data.goal_voltages[i]
-		var lamp_r: float = max(gv * 2.0, 4.0)
-		var cons := _make_component("consumer", {
-			"required_voltage": gv,
-			"required_power": gv * gv / lamp_r,
-			"name": "Лампа %d" % (i + 1),
-			"resistance": lamp_r
-		}) as Consumer
-		cons.is_essential = true
-		_add_component_to_scene(cons, true)
-		cons.global_position = breadboard.snap_global_to_cell(breadboard.to_global(Vector2(
-			Breadboard.PIN_SPACING * (Breadboard.COLS - 4.0),
-			goal_spacing * (i + 1)
-		)))
-		_snap_component_to_board(cons)
-		consumer_targets.append(level_data.goal_voltages[i])
+## ── Buffer ──
 
 func _populate_buffer() -> void:
 	for child in buffer_items.get_children():
 		child.queue_free()
+	_buffer_slots.clear()
 
 	if level_data.allow_wire:
-		for i in range(8):
-			_add_buffer_button("wire", {}, "Провод")
+		_add_buffer_slot("wire", {}, "Провод", 0, true)
+
+	for i in range(level_data.power_count):
+		var pv: float = level_data.power_voltages[i] if i < level_data.power_voltages.size() else 9.0
+		_add_buffer_slot("power_source", {
+			"voltage": pv,
+			"max_current": 5.0
+		}, "Источник %.0f В" % pv, 1, false)
+
+	for i in range(level_data.goal_count):
+		var gv: float = level_data.goal_voltages[i] if i < level_data.goal_voltages.size() else 9.0
+		var lamp_r: float = max(gv * 2.0, 4.0)
+		_add_buffer_slot("consumer", {
+			"required_voltage": gv,
+			"required_power": gv * gv / lamp_r,
+			"name": "Лампа %d" % (i + 1),
+			"resistance": lamp_r
+		}, "Лампа %.0f В" % gv, 1, false)
 
 	for i in range(level_data.resistor_count):
 		var r_val: float = level_data.resistor_values[i] if i < level_data.resistor_values.size() else 10.0
-		_add_buffer_button("resistor", {"resistance": r_val}, "Резистор (%s)" % _format_r(r_val))
+		_add_buffer_slot("resistor", {"resistance": r_val}, "Резистор (%s)" % _format_r(r_val), 1, false)
 
 	if level_data.allow_voltammeter:
-		_add_buffer_button("voltammeter", {}, "Вольт-ампер метр")
+		_add_buffer_slot("voltammeter", {}, "Вольт-амперметр", 1, false)
 
 	if level_data.allow_switch:
-		_add_buffer_button("switch", {}, "Выключатель")
+		_add_buffer_slot("switch", {}, "Выключатель", 1, false)
 
 	if level_data.allow_toggle:
-		_add_buffer_button("toggle_switch", {}, "Переключатель")
+		_add_buffer_slot("toggle_switch", {}, "Переключатель", 1, false)
+
+func _add_buffer_slot(type_name: String, params: Dictionary, base_label: String, count: int, infinite: bool) -> void:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(480, 44)
+	buffer_items.add_child(btn)
+	var slot: Dictionary = {
+		"type": type_name,
+		"params": params,
+		"base_label": base_label,
+		"count": count,
+		"infinite": infinite,
+		"button": btn
+	}
+	_buffer_slots.append(slot)
+	btn.button_down.connect(_on_buffer_slot_drag_start.bind(slot))
+	_refresh_buffer_slot(slot)
+
+func _refresh_buffer_slot(slot: Dictionary) -> void:
+	var btn: Button = slot["button"]
+	if slot["infinite"]:
+		btn.text = slot["base_label"]
+		btn.visible = true
+		btn.disabled = false
+	else:
+		btn.text = "%s × %d" % [slot["base_label"], slot["count"]]
+		btn.visible = slot["count"] > 0
+		btn.disabled = slot["count"] <= 0
 
 func _format_r(r: float) -> String:
 	if r >= 1000.0:
 		return "%.1f кΩ" % (r / 1000.0)
 	return "%.0f Ω" % r
 
-func _add_buffer_button(type_name: String, params: Dictionary, label: String) -> void:
-	var btn := Button.new()
-	btn.text = label
-	btn.custom_minimum_size = Vector2(480, 44)
-	btn.button_down.connect(_on_buffer_item_drag_start.bind(type_name, params))
-	buffer_items.add_child(btn)
+## ── Component factory ──
 
 func _make_component(type_name: String, params: Dictionary) -> BaseComponent:
 	var comp: BaseComponent
@@ -183,12 +241,18 @@ func _add_component_to_scene(comp: BaseComponent, placed: bool) -> void:
 
 func _connect_component_signals(comp: BaseComponent) -> void:
 	comp.body_clicked.connect(_on_component_body_clicked)
+	comp.body_double_clicked.connect(_on_component_double_clicked)
 	comp.placed_on_board.connect(_on_component_placed)
 	comp.rotated.connect(_on_component_rotated)
 	if comp is WireComponent:
 		var wire: WireComponent = comp
 		wire.pin_drag_ended.connect(_on_wire_pin_drag_ended)
 		wire.body_drag_ended.connect(_on_wire_body_drag_ended)
+	if comp is Voltammeter:
+		(comp as Voltammeter).mode_changed.connect(_on_voltammeter_mode_changed)
+
+func _on_voltammeter_mode_changed(_comp: Voltammeter) -> void:
+	_mark_dirty()
 
 func _on_component_rotated(comp: BaseComponent) -> void:
 	_snap_component_to_board(comp)
@@ -197,10 +261,17 @@ func _on_component_body_clicked(comp: BaseComponent) -> void:
 	_set_selected(comp)
 	if comp is PowerSource:
 		_handle_power_source_click(comp as PowerSource)
-	elif comp is SwitchComponent:
-		pass  # already toggled inside the switch
-	elif comp is ToggleSwitch:
-		pass
+	else:
+		## Клик по корпусу может переключить состояние (выключатель, SPDT,
+		## переключение V/A у вольтамперметра). Пересчитываем цепь.
+		_mark_dirty()
+
+func _on_component_double_clicked(comp: BaseComponent) -> void:
+	if comp == null or not is_instance_valid(comp):
+		return
+	if comp.is_fixed:
+		return
+	_remove_component(comp)
 
 func _on_component_placed(comp: BaseComponent) -> void:
 	_snap_component_to_board(comp)
@@ -218,8 +289,7 @@ func _on_wire_pin_drag_ended(wire: WireComponent, pin_index: int) -> void:
 func _on_wire_body_drag_ended(wire: WireComponent) -> void:
 	_snap_component_to_board(wire)
 
-## Snap every pin of the component onto its nearest breadboard pin. Use the
-## first pin to decide the overall offset, so the relative layout is preserved.
+## Snap every pin of the component onto its nearest breadboard pin.
 func _snap_component_to_board(comp: BaseComponent) -> void:
 	if comp.pin_positions.is_empty():
 		return
@@ -260,15 +330,15 @@ func _update_pin_connection_visuals() -> void:
 				continue
 			comp.mark_pin_connected(i, bus_usage.get(bus, 0) > 1)
 
-func _snap_global_to_board(global_pos: Vector2) -> Vector2:
-	return to_local(breadboard.snap_global_to_cell(global_pos))
-
 ## ── Buffer dragging ──
 
-func _on_buffer_item_drag_start(type_name: String, params: Dictionary) -> void:
-	var comp := _make_component(type_name, params)
+func _on_buffer_slot_drag_start(slot: Dictionary) -> void:
+	if not slot["infinite"] and slot["count"] <= 0:
+		return
+	var comp := _make_component(slot["type"], slot["params"])
 	if comp == null:
 		return
+	comp.set_meta("buffer_slot_ref", slot)
 	components_layer.add_child(comp)
 	comp.global_position = get_global_mouse_position()
 	placed_components.append(comp)
@@ -287,6 +357,13 @@ func _finish_buffer_drag() -> void:
 	_buffer_drag_comp.z_index = 0
 	_snap_component_to_board(_buffer_drag_comp)
 	_buffer_drag_comp.is_placed = true
+
+	if _buffer_drag_comp.has_meta("buffer_slot_ref"):
+		var slot: Dictionary = _buffer_drag_comp.get_meta("buffer_slot_ref")
+		if not slot["infinite"]:
+			slot["count"] -= 1
+			_refresh_buffer_slot(slot)
+
 	_buffer_drag_comp = null
 	_dragging_from_buffer = false
 
@@ -312,6 +389,13 @@ func _find_component_at(global_pos: Vector2) -> BaseComponent:
 func _remove_component(comp: BaseComponent) -> void:
 	if comp == null:
 		return
+
+	if comp.has_meta("buffer_slot_ref"):
+		var slot: Dictionary = comp.get_meta("buffer_slot_ref")
+		if not slot["infinite"]:
+			slot["count"] += 1
+			_refresh_buffer_slot(slot)
+
 	placed_components.erase(comp)
 	circuit_graph.remove_component(comp)
 	if selected_component == comp:
@@ -346,6 +430,9 @@ func _handle_power_source_click(ps: PowerSource) -> void:
 	if ps.is_cooldown:
 		status_label.text = "Источник перезаряжается: %.1f с" % ps.cooldown_remaining
 		return
+	if _evaluating:
+		return
+	_evaluating = true
 
 	for comp in placed_components:
 		if comp is PowerSource:
@@ -354,29 +441,52 @@ func _handle_power_source_click(ps: PowerSource) -> void:
 	await get_tree().process_frame
 	_update_pin_connection_visuals()
 	circuit_graph.solve()
+	_circuit_dirty = false
+
+	## Даём несколько секунд понаблюдать за показаниями приборов,
+	## пока источник под напряжением. В это время цепь пересчитывается
+	## каждый кадр, так что вольт-амперметр показывает реальные значения.
+	status_label.text = "⚡ Питание подано… снимите показания с приборов."
+	var t: float = OBSERVATION_DELAY
+	while t > 0.0:
+		t -= get_process_delta_time()
+		_mark_dirty()
+		await get_tree().process_frame
+
+	_update_pin_connection_visuals()
+	circuit_graph.solve()
+	_circuit_dirty = false
 
 	if _check_win_condition():
 		status_label.text = "✔ Цепь собрана правильно!"
-		await get_tree().create_timer(0.6).timeout
+		await get_tree().create_timer(WIN_TRANSITION_DELAY).timeout
 		GameManager.complete_level()
 		get_tree().change_scene_to_file("res://scenes/level_complete/level_complete.tscn")
-	else:
-		_start_recharge_all_sources()
-		status_label.text = "✘ Напряжение не соответствует. Источник перезаряжается 5 с."
+		_evaluating = false
+		return
+
+	_start_recharge_all_sources()
+	## Источник выключен, но мы НЕ сбрасываем показания приборов — они
+	## должны остаться видимыми, чтобы пользователь понял, почему не
+	## получилось. Поэтому не помечаем цепь грязной после fail.
+	_circuit_dirty = false
+	status_label.text = "✘ Напряжение не соответствует. Источник перезаряжается %.0f с." % POWER_COOLDOWN_SECONDS
+	_evaluating = false
 
 func _start_recharge_all_sources() -> void:
 	for comp in placed_components:
 		if comp is PowerSource:
 			(comp as PowerSource).start_cooldown(POWER_COOLDOWN_SECONDS)
 
+## Win condition: EACH required target voltage must be matched by at least one
+## consumer that is actually powered (voltage within tolerance AND I > 0).
+## Matching is a greedy 1-to-1 assignment by best error.
 func _check_win_condition() -> bool:
 	var consumers := circuit_graph.find_consumers()
 	if consumers.is_empty():
 		return false
-
 	if consumer_targets.is_empty():
 		return false
-
 	if consumers.size() < consumer_targets.size():
 		return false
 
@@ -400,7 +510,7 @@ func _check_win_condition() -> bool:
 	return true
 
 func _update_status_default() -> void:
-	status_label.text = "Соберите схему и щёлкните по источнику питания."
+	status_label.text = "Перетащите элементы, соберите схему и щёлкните по источнику питания."
 
 ## ── UI handlers ──
 
@@ -412,4 +522,6 @@ func _on_hint_pressed() -> void:
 
 func _on_hint_bg_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		hint_overlay.visible = false
+	elif event is InputEventScreenTouch and event.pressed:
 		hint_overlay.visible = false
