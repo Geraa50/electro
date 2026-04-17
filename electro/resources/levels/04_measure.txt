@@ -1,0 +1,13 @@
+name            = Уровень 4: измерения
+hint            = Используйте вольт-ампер метр в последовательной цепи, чтобы измерить ток и напряжение на нагрузке. Подберите резистор так, чтобы лампа получила 5 В.
+power_count     = 1
+power_voltages  = 10
+goal_count      = 1
+goal_voltages   = 5
+wire            = true
+voltammeter     = true
+toggle          = false
+switch          = true
+resistors       = 1
+resistor_values = 10
+tolerance       = 0.5

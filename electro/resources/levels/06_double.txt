@@ -1,0 +1,13 @@
+name            = Уровень 6: два источника
+hint            = Два источника могут питать одну цепь последовательно (складывая напряжения) или параллельно (распределяя ток). Соберите схему так, чтобы обе лампы горели в штатном режиме.
+power_count     = 2
+power_voltages  = 6, 6
+goal_count      = 2
+goal_voltages   = 12, 12
+wire            = true
+voltammeter     = true
+toggle          = false
+switch          = true
+resistors       = 3
+resistor_values = 10, 20, 20
+tolerance       = 1.0

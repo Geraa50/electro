@@ -1,142 +1,227 @@
 class_name CircuitGraph
 extends RefCounted
 
-## Represents a node in the circuit graph
-class CircuitNode:
-	var id: int
-	var component: BaseComponent
-	var pin_index: int
-	var connections: Array[int] = []
+## Builds a circuit from components placed on a Breadboard and solves it via MNA.
+## Each breadboard bus is a node. Wires / closed switches / active toggle paths
+## are short-circuits that merge buses into supernodes via union-find.
 
-	func _init(p_id: int, p_component: BaseComponent, p_pin_index: int) -> void:
-		id = p_id
-		component = p_component
-		pin_index = p_pin_index
+var breadboard: Breadboard
+var components: Array[BaseComponent] = []
+var solver: MNASolver
+var last_result: Dictionary = {}
 
-## Represents an edge (wire) between two circuit nodes
-class CircuitEdge:
-	var from_node_id: int
-	var to_node_id: int
-	var wire_ref: Node2D
+func _init(p_board: Breadboard = null) -> void:
+	breadboard = p_board
+	solver = MNASolver.new()
 
-	func _init(p_from: int, p_to: int, p_wire: Node2D = null) -> void:
-		from_node_id = p_from
-		to_node_id = p_to
-		wire_ref = p_wire
+func set_breadboard(bb: Breadboard) -> void:
+	breadboard = bb
 
-var nodes: Dictionary = {}
-var edges: Array[CircuitEdge] = []
-var _next_node_id: int = 0
-var solver: CircuitSolver
-
-func _init() -> void:
-	solver = CircuitSolver.new()
-
-func add_component(comp: BaseComponent) -> Array[int]:
-	var pin_ids: Array[int] = []
-	for i in range(comp.pin_positions.size()):
-		var node := CircuitNode.new(_next_node_id, comp, i)
-		nodes[_next_node_id] = node
-		pin_ids.append(_next_node_id)
-		_next_node_id += 1
-	return pin_ids
+func add_component(comp: BaseComponent) -> void:
+	if comp not in components:
+		components.append(comp)
 
 func remove_component(comp: BaseComponent) -> void:
-	var ids_to_remove: Array[int] = []
-	for id in nodes:
-		if nodes[id].component == comp:
-			ids_to_remove.append(id)
-	for id in ids_to_remove:
-		_remove_edges_for_node(id)
-		nodes.erase(id)
+	components.erase(comp)
 
-func connect_pins(node_a_id: int, node_b_id: int, wire: Node2D = null) -> void:
-	if node_a_id not in nodes or node_b_id not in nodes:
-		return
-	var edge := CircuitEdge.new(node_a_id, node_b_id, wire)
-	edges.append(edge)
-	nodes[node_a_id].connections.append(node_b_id)
-	nodes[node_b_id].connections.append(node_a_id)
+func clear() -> void:
+	components.clear()
+	last_result.clear()
 
-func disconnect_wire(wire: Node2D) -> void:
-	var to_remove: Array[CircuitEdge] = []
-	for edge in edges:
-		if edge.wire_ref == wire:
-			to_remove.append(edge)
-	for edge in to_remove:
-		edges.erase(edge)
-		if edge.from_node_id in nodes:
-			nodes[edge.from_node_id].connections.erase(edge.to_node_id)
-		if edge.to_node_id in nodes:
-			nodes[edge.to_node_id].connections.erase(edge.from_node_id)
-
-func _remove_edges_for_node(node_id: int) -> void:
-	var to_remove: Array[CircuitEdge] = []
-	for edge in edges:
-		if edge.from_node_id == node_id or edge.to_node_id == node_id:
-			to_remove.append(edge)
-	for edge in to_remove:
-		edges.erase(edge)
-		var other_id := edge.to_node_id if edge.from_node_id == node_id else edge.from_node_id
-		if other_id in nodes:
-			nodes[other_id].connections.erase(node_id)
-
-func find_node_ids_for_component(comp: BaseComponent) -> Array[int]:
-	var result: Array[int] = []
-	for id in nodes:
-		if nodes[id].component == comp:
-			result.append(id)
-	return result
-
-func find_power_sources() -> Array[BaseComponent]:
-	var sources: Array[BaseComponent] = []
-	var seen: Array[BaseComponent] = []
-	for id in nodes:
-		var comp: BaseComponent = nodes[id].component
-		if comp.get_component_type() == "power_source" and comp not in seen:
-			sources.append(comp)
-			seen.append(comp)
-	return sources
-
-func find_consumers() -> Array[BaseComponent]:
-	var consumers: Array[BaseComponent] = []
-	var seen: Array[BaseComponent] = []
-	for id in nodes:
-		var comp: BaseComponent = nodes[id].component
-		if comp.get_component_type() == "consumer" and comp not in seen:
-			consumers.append(comp)
-			seen.append(comp)
-	return consumers
+## Compute, for each component, the bus id each pin currently lives on.
+## Returns dict: component -> Array[int] (size = pin count).
+func _component_pin_buses() -> Dictionary:
+	var out: Dictionary = {}
+	if breadboard == null:
+		return out
+	for comp in components:
+		if not is_instance_valid(comp):
+			continue
+		var pins: Array = []
+		for i in range(comp.pin_positions.size()):
+			var gpos := comp.get_pin_global_position(i)
+			var bus := breadboard.get_bus_for_global(gpos)
+			pins.append(bus)
+		out[comp] = pins
+	return out
 
 func solve() -> Dictionary:
-	return solver.solve(self)
+	var result: Dictionary = {
+		"ok": false,
+		"is_closed": false,
+		"source_voltage": 0.0,
+		"total_current": 0.0,
+		"components": {}
+	}
 
-func is_circuit_closed() -> bool:
-	return solver.is_circuit_closed(self)
+	if breadboard == null:
+		last_result = result
+		return result
 
-func get_adjacency() -> Dictionary:
-	var adj: Dictionary = {}
-	for id in nodes:
-		adj[id] = []
-	for edge in edges:
-		if edge.from_node_id in adj:
-			adj[edge.from_node_id].append(edge.to_node_id)
-		if edge.to_node_id in adj:
-			adj[edge.to_node_id].append(edge.from_node_id)
-	# Also connect pins of the same component internally
-	var comp_pins: Dictionary = {}
-	for id in nodes:
-		var comp: BaseComponent = nodes[id].component
-		if comp not in comp_pins:
-			comp_pins[comp] = []
-		comp_pins[comp].append(id)
-	for comp in comp_pins:
-		if comp.is_conducting():
-			var pins: Array = comp_pins[comp]
-			for i in range(pins.size()):
-				for j in range(i + 1, pins.size()):
-					if pins[j] not in adj[pins[i]]:
-						adj[pins[i]].append(pins[j])
-					if pins[i] not in adj[pins[j]]:
-						adj[pins[j]].append(pins[i])
-	return adj
+	var pin_buses := _component_pin_buses()
+
+	var bus_set: Dictionary = {}
+	for comp in pin_buses:
+		for b in pin_buses[comp]:
+			if b >= 0:
+				bus_set[b] = true
+
+	if bus_set.is_empty():
+		last_result = result
+		return result
+
+	var uf := UnionFind.new()
+	for b in bus_set.keys():
+		uf.add(b)
+
+	## Short-circuit merges (wires, closed switches, active toggle paths, voltammeter-as-wire? No, voltammeter stays as small-R element so we can read current).
+	for comp in pin_buses:
+		var pins: Array = pin_buses[comp]
+		var type: String = comp.get_component_type()
+		if type == "wire":
+			if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0:
+				uf.union(pins[0], pins[1])
+
+	## Resistive / measurement elements and conducting switches (as small-R) and voltage sources.
+	var resistors: Array = []
+	var sources: Array = []
+
+	for comp in pin_buses:
+		if not is_instance_valid(comp):
+			continue
+		var pins: Array = pin_buses[comp]
+		var type: String = comp.get_component_type()
+
+		match type:
+			"wire":
+				pass  # already merged
+			"resistor":
+				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0:
+					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": maxf(comp.get_resistance(), 0.0001)})
+			"consumer":
+				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0:
+					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": maxf(comp.get_resistance(), 0.0001)})
+			"voltammeter":
+				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0:
+					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": 0.001})
+			"switch":
+				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0 and comp.is_conducting():
+					resistors.append({"comp": comp, "a": pins[0], "b": pins[1], "r": 0.001})
+			"toggle_switch":
+				for pair in comp.get_internal_connections():
+					var i: int = pair[0]
+					var j: int = pair[1]
+					if i < pins.size() and j < pins.size() and pins[i] >= 0 and pins[j] >= 0:
+						resistors.append({"comp": comp, "a": pins[i], "b": pins[j], "r": 0.001})
+			"power_source":
+				if pins.size() >= 2 and pins[0] >= 0 and pins[1] >= 0 and comp.is_conducting():
+					## Positive terminal = pin 0. Voltage source with + at pin0, - at pin1.
+					sources.append({"comp": comp, "p": pins[0], "n": pins[1], "v": comp.get_voltage()})
+
+	var supernode_set: Dictionary = {}
+	for b in bus_set.keys():
+		supernode_set[uf.find(b)] = true
+
+	var supernodes: Array = supernode_set.keys()
+
+	for r in resistors:
+		r["a"] = uf.find(r["a"])
+		r["b"] = uf.find(r["b"])
+	for s in sources:
+		s["p"] = uf.find(s["p"])
+		s["n"] = uf.find(s["n"])
+
+	var ground: int = -1
+	if not sources.is_empty():
+		ground = sources[0]["n"]
+	elif not supernodes.is_empty():
+		ground = supernodes[0]
+
+	if ground == -1:
+		last_result = result
+		return result
+
+	var mna := solver.solve(supernodes, resistors, sources, ground)
+	if not mna.get("ok", false):
+		_zero_out_components()
+		last_result = result
+		return result
+
+	result["ok"] = true
+	var closed := false
+	for s in sources:
+		var comp = s["comp"]
+		var key: int = comp.get_instance_id()
+		var i_val: float = mna["i_of_component"].get(key, 0.0)
+		if absf(i_val) > 0.0001:
+			closed = true
+		result["source_voltage"] = comp.get_voltage()
+		result["total_current"] += i_val
+	result["is_closed"] = closed
+
+	var comp_data: Dictionary = {}
+	for comp in pin_buses:
+		if not is_instance_valid(comp):
+			continue
+		var key: int = comp.get_instance_id()
+		var i_val: float = mna["i_of_component"].get(key, 0.0)
+		var v_val: float = mna["v_of_component"].get(key, 0.0)
+		comp_data[key] = {
+			"component": comp,
+			"current": absf(i_val),
+			"voltage": absf(v_val),
+			"power": absf(i_val * v_val),
+			"resistance": comp.get_resistance()
+		}
+		comp.update_visual_state(absf(i_val), absf(v_val))
+
+	for comp in pin_buses:
+		if comp.get_instance_id() not in comp_data and is_instance_valid(comp):
+			comp.update_visual_state(0.0, 0.0)
+
+	result["components"] = comp_data
+	last_result = result
+	return result
+
+func _zero_out_components() -> void:
+	for comp in components:
+		if is_instance_valid(comp):
+			comp.update_visual_state(0.0, 0.0)
+
+func find_power_sources() -> Array[BaseComponent]:
+	var out: Array[BaseComponent] = []
+	for comp in components:
+		if is_instance_valid(comp) and comp.get_component_type() == "power_source":
+			out.append(comp)
+	return out
+
+func find_consumers() -> Array[BaseComponent]:
+	var out: Array[BaseComponent] = []
+	for comp in components:
+		if is_instance_valid(comp) and comp.get_component_type() == "consumer":
+			out.append(comp)
+	return out
+
+## --- Union-Find helper ---
+class UnionFind:
+	var parent: Dictionary = {}
+
+	func add(x) -> void:
+		if x not in parent:
+			parent[x] = x
+
+	func find(x):
+		if x not in parent:
+			return x
+		while parent[x] != x:
+			parent[x] = parent[parent[x]]
+			x = parent[x]
+		return x
+
+	func union(a, b) -> void:
+		add(a)
+		add(b)
+		var ra = find(a)
+		var rb = find(b)
+		if ra != rb:
+			parent[ra] = rb

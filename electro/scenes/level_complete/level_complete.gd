@@ -6,7 +6,8 @@ extends Control
 
 func _ready() -> void:
 	var level_index := GameManager.current_level_index
-	if level_index >= GameManager.total_levels - 1:
+	var total: int = GameManager.total_levels
+	if total <= 0 or level_index >= total - 1:
 		next_button.text = "ВСЕ ПРОЙДЕНО!"
 		next_button.disabled = true
 		title_label.text = "ПОЗДРАВЛЯЕМ!"

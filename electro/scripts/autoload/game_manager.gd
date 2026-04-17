@@ -3,18 +3,42 @@ extends Node
 signal level_completed(level_index: int)
 signal level_failed(level_index: int)
 
+const LEVELS_DIR := "res://resources/levels"
+const POWER_COOLDOWN := 5.0
+
 var current_level_index: int = -1
 var completed_levels: Array[int] = []
-var total_levels: int = 7
+var level_files: Array[String] = []
+
+var total_levels: int:
+	get:
+		return level_files.size()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_scan_levels()
+
+func _scan_levels() -> void:
+	level_files.clear()
+	var dir := DirAccess.open(LEVELS_DIR)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var file := dir.get_next()
+	while file != "":
+		if not dir.current_is_dir() and file.ends_with(".txt"):
+			level_files.append(file)
+		file = dir.get_next()
+	dir.list_dir_end()
+	level_files.sort()
+
+func get_level_resource_path(level_index: int) -> String:
+	if level_index < 0 or level_index >= level_files.size():
+		return ""
+	return "%s/%s" % [LEVELS_DIR, level_files[level_index]]
 
 func start_level(level_index: int) -> void:
 	current_level_index = level_index
-	var path := "res://resources/levels/level_%d.tres" % level_index
-	if level_index == 0:
-		path = "res://resources/levels/tutorial.tres"
 	get_tree().change_scene_to_file("res://scenes/game/game_field.tscn")
 
 func complete_level() -> void:
@@ -39,11 +63,6 @@ func is_level_unlocked(level_index: int) -> bool:
 	if level_index == 0:
 		return true
 	return (level_index - 1) in completed_levels
-
-func get_level_resource_path(level_index: int) -> String:
-	if level_index == 0:
-		return "res://resources/levels/tutorial.tres"
-	return "res://resources/levels/level_%d.tres" % level_index
 
 func quit_game() -> void:
 	get_tree().quit()

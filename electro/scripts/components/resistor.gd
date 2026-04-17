@@ -3,19 +3,15 @@ extends BaseComponent
 
 @export var resistance: float = 100.0
 
-const BODY_SIZE := Vector2(50, 20)
-const BODY_COLOR := Color(0.7, 0.55, 0.35)
-const STRIPE_COLORS: Array[Color] = [
-	Color(0.6, 0.2, 0.2),
-	Color(0.2, 0.5, 0.2),
-	Color(0.2, 0.2, 0.6),
-	Color(0.6, 0.6, 0.2)
-]
+const BODY_SIZE := Vector2(56, 22)
+const BORDER_COLOR := Color(0.05, 0.05, 0.05)
+const FILL_COLOR := Color(0.05, 0.05, 0.05, 0.0)
+const LABEL_COLOR := Color(0.05, 0.05, 0.05)
 
 func _setup_pins() -> void:
 	pin_positions = [
-		Vector2(-35, 0),
-		Vector2(35, 0)
+		Vector2(-40, 0),
+		Vector2(40, 0)
 	]
 
 func get_component_type() -> String:
@@ -24,28 +20,30 @@ func get_component_type() -> String:
 func get_resistance() -> float:
 	return resistance
 
+func _get_bounding_rect() -> Rect2:
+	return Rect2(Vector2(-BODY_SIZE.x * 0.5, -BODY_SIZE.y * 0.5), BODY_SIZE)
+
 func _draw() -> void:
-	# Lead wires
-	draw_line(pin_positions[0], Vector2(-BODY_SIZE.x / 2, 0), Color(0.5, 0.5, 0.5), 2.0)
-	draw_line(pin_positions[1], Vector2(BODY_SIZE.x / 2, 0), Color(0.5, 0.5, 0.5), 2.0)
+	draw_line(pin_positions[0], Vector2(-BODY_SIZE.x * 0.5, 0), BORDER_COLOR, 2.0)
+	draw_line(Vector2(BODY_SIZE.x * 0.5, 0), pin_positions[1], BORDER_COLOR, 2.0)
 
-	# Resistor body
-	draw_rect(Rect2(-BODY_SIZE / 2, BODY_SIZE), BODY_COLOR)
+	var body_rect := Rect2(-BODY_SIZE * 0.5, BODY_SIZE)
+	draw_rect(body_rect, FILL_COLOR, true)
+	draw_rect(body_rect, BORDER_COLOR, false, 2.0)
 
-	# Color stripes
-	for i in range(STRIPE_COLORS.size()):
-		var x := -BODY_SIZE.x / 2 + 6 + i * 10
-		draw_rect(Rect2(x, -BODY_SIZE.y / 2 + 2, 4, BODY_SIZE.y - 4), STRIPE_COLORS[i])
+	var r_text := _format_resistance(resistance)
+	draw_string(ThemeDB.fallback_font, Vector2(-22, BODY_SIZE.y * 0.5 + 14), r_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, LABEL_COLOR)
 
-	# Resistance label
-	var r_text := "%.0f Ω" % resistance
-	draw_string(ThemeDB.fallback_font, Vector2(-18, BODY_SIZE.y / 2 + 14), r_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color.WHITE)
+	for i in range(pin_positions.size()):
+		var col := PIN_CONNECTED_COLOR if i in connected_pins else Color(0.1, 0.1, 0.1)
+		draw_circle(pin_positions[i], PIN_RADIUS, col)
 
-	# Pins
-	for pin in pin_positions:
-		draw_circle(pin, PIN_RADIUS, PIN_COLOR)
+	_draw_selection_indicator()
 
-	_draw_connection_indicators()
+func _format_resistance(r: float) -> String:
+	if r >= 1000.0:
+		return "%.1f кΩ" % (r / 1000.0)
+	return "%.0f Ω" % r
 
-func update_visual_state(current: float, voltage: float) -> void:
+func update_visual_state(_current: float, _voltage: float) -> void:
 	queue_redraw()

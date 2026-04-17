@@ -1,0 +1,13 @@
+name            = Уровень 2: последовательное соединение
+hint            = Соберите цепь так, чтобы лампе досталось ровно 6 В. Последовательное соединение резисторов даёт R = R1 + R2, напряжение распределяется пропорционально сопротивлениям.
+power_count     = 1
+power_voltages  = 12
+goal_count      = 1
+goal_voltages   = 6
+wire            = true
+voltammeter     = true
+toggle          = false
+switch          = true
+resistors       = 2
+resistor_values = 10, 10
+tolerance       = 0.8

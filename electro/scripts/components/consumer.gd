@@ -8,17 +8,18 @@ extends BaseComponent
 
 var is_powered: bool = false
 var current_voltage: float = 0.0
+var current_current: float = 0.0
 var current_power: float = 0.0
 
-const BODY_RADIUS := 20.0
+const BODY_RADIUS := 22.0
 const OFF_COLOR := Color(0.4, 0.4, 0.4)
 const ON_COLOR := Color(1.0, 0.95, 0.3)
 const GLOW_COLOR := Color(1.0, 0.9, 0.2, 0.3)
 
 func _setup_pins() -> void:
 	pin_positions = [
-		Vector2(-30, 0),
-		Vector2(30, 0)
+		Vector2(-40, 0),
+		Vector2(40, 0)
 	]
 
 func get_component_type() -> String:
@@ -33,44 +34,45 @@ func get_required_voltage() -> float:
 func get_required_power() -> float:
 	return required_power
 
-func _draw() -> void:
-	# Lead wires
-	draw_line(pin_positions[0], Vector2(-BODY_RADIUS, 0), Color(0.5, 0.5, 0.5), 2.0)
-	draw_line(pin_positions[1], Vector2(BODY_RADIUS, 0), Color(0.5, 0.5, 0.5), 2.0)
+func _get_bounding_rect() -> Rect2:
+	return Rect2(Vector2(-BODY_RADIUS, -BODY_RADIUS), Vector2(BODY_RADIUS * 2, BODY_RADIUS * 2))
 
-	# Lamp bulb
+func _draw() -> void:
+	draw_line(pin_positions[0], Vector2(-BODY_RADIUS, 0), Color(0.3, 0.3, 0.3), 2.0)
+	draw_line(Vector2(BODY_RADIUS, 0), pin_positions[1], Color(0.3, 0.3, 0.3), 2.0)
+
 	var color := ON_COLOR if is_powered else OFF_COLOR
 	if is_powered:
-		draw_circle(Vector2.ZERO, BODY_RADIUS + 8, GLOW_COLOR)
+		draw_circle(Vector2.ZERO, BODY_RADIUS + 10, GLOW_COLOR)
 	draw_circle(Vector2.ZERO, BODY_RADIUS, color)
+	draw_arc(Vector2.ZERO, BODY_RADIUS, 0, TAU, 32, Color(0.2, 0.2, 0.2), 2.0)
 
-	# Filament
-	if is_powered:
-		draw_line(Vector2(-8, 8), Vector2(0, -8), Color(1, 0.7, 0.1), 2.0)
-		draw_line(Vector2(0, -8), Vector2(8, 8), Color(1, 0.7, 0.1), 2.0)
-	else:
-		draw_line(Vector2(-8, 8), Vector2(0, -8), Color(0.3, 0.3, 0.3), 1.5)
-		draw_line(Vector2(0, -8), Vector2(8, 8), Color(0.3, 0.3, 0.3), 1.5)
+	var fil_col := Color(1.0, 0.6, 0.1) if is_powered else Color(0.3, 0.3, 0.3)
+	draw_line(Vector2(-8, 8), Vector2(0, -8), fil_col, 2.0)
+	draw_line(Vector2(0, -8), Vector2(8, 8), fil_col, 2.0)
 
-	# Name and status
+	var font := ThemeDB.fallback_font
 	var status_text := consumer_name
 	if is_powered:
 		status_text += " ✓"
-	draw_string(ThemeDB.fallback_font, Vector2(-20, BODY_RADIUS + 16), status_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color.WHITE)
+	draw_string(font, Vector2(-30, BODY_RADIUS + 16), status_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color(0.1, 0.1, 0.1))
 
-	# Voltage info
-	var v_text := "%.1f/%.1f В" % [current_voltage, required_voltage]
-	draw_string(ThemeDB.fallback_font, Vector2(-24, BODY_RADIUS + 30), v_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 10, Color.LIGHT_GRAY)
+	var v_text := "%.1f / %.1f В" % [current_voltage, required_voltage]
+	draw_string(font, Vector2(-34, BODY_RADIUS + 32), v_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(0.25, 0.25, 0.25))
 
-	# Pins
-	for pin in pin_positions:
-		draw_circle(pin, PIN_RADIUS, PIN_COLOR)
+	for i in range(pin_positions.size()):
+		var c := PIN_CONNECTED_COLOR if i in connected_pins else Color(0.1, 0.1, 0.1)
+		draw_circle(pin_positions[i], PIN_RADIUS, c)
 
-	_draw_connection_indicators()
+	_draw_selection_indicator()
 
 func update_visual_state(current: float, voltage: float) -> void:
 	current_voltage = voltage
+	current_current = current
 	current_power = voltage * current
-	var voltage_ok := absf(voltage - required_voltage) <= required_voltage * 0.15
+	var voltage_ok: bool = absf(voltage - required_voltage) <= maxf(required_voltage * 0.15, 0.5)
 	is_powered = voltage_ok and current > 0.001
 	queue_redraw()
+
+func is_target_met() -> bool:
+	return absf(current_voltage - required_voltage) <= maxf(required_voltage * 0.15, 0.5) and current_current > 0.001

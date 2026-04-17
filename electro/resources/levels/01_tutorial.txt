@@ -1,0 +1,14 @@
+# Формат: key = value
+name            = Туториал: первая цепь
+hint            = Соедините «+» и «−» батареи с лампой через провода. Когда нажмёте на батарею, она подаст напряжение. Чтобы пройти уровень, лампа должна получить нужное напряжение.
+power_count     = 1
+power_voltages  = 9
+goal_count      = 1
+goal_voltages   = 9
+wire            = true
+voltammeter     = false
+toggle          = false
+switch          = false
+resistors       = 0
+resistor_values =
+tolerance       = 1.0
