@@ -60,11 +60,24 @@
 
 ## 🚀 Запуск
 
-### 📋 Требования
+### 📱 Готовые сборки для ОС Аврора
 
-- 🎮 **Godot Engine 4.4** или новее — [скачать](https://godotengine.org/download)
+Скачайте готовый RPM-пакет из [**📦 Releases**](https://github.com/Geraa50/electro/releases/latest):
 
-### 🛠️ Установка
+| 🏗️ Архитектура | 📥 Файл |
+|:---:|:---|
+| 🟢 **aarch64** (64-бит ARM) | [`pmifi.wiki.electro-0.1-1.aarch64.rpm`](https://github.com/Geraa50/electro/releases/latest) |
+| 🟡 **armv7hl** (32-бит ARM) | [`pmifi.wiki.electro-0.1-1.armv7hl.rpm`](https://github.com/Geraa50/electro/releases/latest) |
+
+Установка на устройство с ОС Аврора:
+
+```sh
+pkcon install-local pmifi.wiki.electro-0.1-1.aarch64.rpm
+```
+
+### 💻 Запуск из исходников
+
+**Требования:** 🎮 **Godot Engine 4.4** или новее — [скачать](https://godotengine.org/download)
 
 ```bash
 # 1. Клонируем репозиторий
@@ -76,9 +89,7 @@ cd electro/electro
 # 3. Открываем project.godot в Godot Engine и жмём F5
 ```
 
-### 🎯 Альтернативно
-
-Просто запустите Godot, выберите **Import** и укажите `electro/project.godot` 📂
+Или просто запустите Godot, выберите **Import** и укажите `electro/project.godot` 📂
 
 ---
 
