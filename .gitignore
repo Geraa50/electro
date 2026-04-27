@@ -34,8 +34,10 @@ new_tz
 ПШ+*/
 
 # Сборки (выкладываются через GitHub Releases)
+build/
 *.rpm
 *.apk
+*.apk.idsig
 *.exe
 *.pck
 *.zip

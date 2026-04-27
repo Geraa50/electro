@@ -6,9 +6,11 @@ const WIN_TRANSITION_DELAY := 2.6
 ## пользователю время снять показания с вольт-амперметра.
 const OBSERVATION_DELAY := 2.0
 
-## 5 кликов в верхнем левом углу экрана за короткое время — авто-прохождение
-## уровня (чит-код для отладки / прохождения сложных уровней).
-const CHEAT_CORNER := Rect2(0, 0, 60, 60)
+## 5 кликов в нижнем левом углу экрана за короткое время — авто-прохождение
+## уровня (чит-код для отладки / прохождения сложных уровней). Зона задана
+## размером в пикселях; реальный прямоугольник считается каждый раз от текущего
+## размера вьюпорта, чтобы корректно работало при ресайзе окна и на мобильных.
+const CHEAT_ZONE_SIZE := Vector2(60, 60)
 const CHEAT_CLICKS_NEEDED := 5
 const CHEAT_WINDOW_SECONDS := 4.0
 
@@ -63,7 +65,7 @@ func _input(event: InputEvent) -> void:
 				_finish_buffer_drag()
 
 func _unhandled_input(event: InputEvent) -> void:
-	## Клики по верхнему левому углу экрана — счётчик для чит-кода.
+	## Клики по нижнему левому углу экрана — счётчик для чит-кода.
 	## Сюда попадают только те нажатия, которые не были перехвачены
 	## UI-элементами (например, кнопкой «МЕНЮ»).
 	var pos: Vector2
@@ -80,7 +82,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			is_press = true
 	if not is_press:
 		return
-	if not CHEAT_CORNER.has_point(pos):
+	if not _cheat_zone_rect().has_point(pos):
 		return
 
 	var now: float = Time.get_ticks_msec() / 1000.0
@@ -96,6 +98,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	else:
 		status_label.text = "🛠 Чит: осталось %d нажатий" % left
 
+func _cheat_zone_rect() -> Rect2:
+	var vp_size: Vector2 = get_viewport().get_visible_rect().size
+	var origin := Vector2(0.0, vp_size.y - CHEAT_ZONE_SIZE.y)
+	return Rect2(origin, CHEAT_ZONE_SIZE)
+
 func _auto_complete_level() -> void:
 	if _evaluating:
 		return
@@ -109,8 +116,7 @@ func _load_current_level() -> void:
 	var level_index := GameManager.current_level_index
 	if level_index < 0:
 		level_index = 0
-	var path := GameManager.get_level_resource_path(level_index)
-	level_data = LevelLoader.load_level(path)
+	level_data = GameManager.get_level_data(level_index)
 	if level_data == null:
 		level_data = LevelData.new()
 		level_data.level_name = "Уровень %d" % level_index

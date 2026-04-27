@@ -66,13 +66,13 @@
 
 | 🏗️ Архитектура | 📥 Файл |
 |:---:|:---|
-| 🟢 **aarch64** (64-бит ARM) | [`pmifi.wiki.electro-0.1-1.aarch64.rpm`](https://github.com/Geraa50/electro/releases/latest) |
-| 🟡 **armv7hl** (32-бит ARM) | [`pmifi.wiki.electro-0.1-1.armv7hl.rpm`](https://github.com/Geraa50/electro/releases/latest) |
+| 🟢 **aarch64** (64-бит ARM) | [`pmifi.electro-0.5-1.aarch64.rpm`](https://github.com/Geraa50/electro/releases/latest) |
+| 🟡 **armv7hl** (32-бит ARM) | [`pmifi.electro-0.5-1.armv7hl.rpm`](https://github.com/Geraa50/electro/releases/latest) |
 
 Установка на устройство с ОС Аврора:
 
 ```sh
-pkcon install-local pmifi.wiki.electro-0.1-1.aarch64.rpm
+pkcon install-local pmifi.electro-0.5-1.aarch64.rpm
 ```
 
 ### 💻 Запуск из исходников
@@ -100,7 +100,7 @@ electro/
 ├── 🎨 assets/          # Графика, спрайты, звуки
 ├── 🖼️ icons/           # Иконки приложения (86, 108, 128, 172 px)
 ├── 📚 resources/
-│   └── levels/         # Текстовые файлы уровней (key=value)
+│   └── levels/         # Уровни как нативные ресурсы Godot (.tres)
 ├── 🎬 scenes/
 │   ├── main_menu/      # Главное меню
 │   ├── level_select/   # Выбор уровня
@@ -121,25 +121,32 @@ electro/
 
 ## 🧩 Формат уровней
 
-Уровни описываются простым текстовым форматом `key = value` 📝:
+Каждый уровень — это нативный Godot-ресурс [`LevelData`](electro/scripts/level/level_data.gd) (`.tres`-файл) 📝. Все уровни жёстко зарегистрированы в [`GameManager`](electro/scripts/autoload/game_manager.gd) через `preload()`, поэтому гарантированно попадают в `.pck` при экспорте — это критично для портов на закрытые ОС вроде **Авроры**, где `DirAccess`/`FileAccess` к произвольным файлам внутри пакета может быть ограничен.
+
+Пример уровня (`electro/resources/levels/01_tutorial.tres`):
 
 ```ini
-name            = Туториал: первая цепь
-hint            = Соедините «+» и «−» батареи с лампой через провода.
-power_count     = 1
-power_voltages  = 9
-goal_count      = 1
-goal_voltages   = 9
-wire            = true
-voltammeter     = false
-toggle          = false
-switch          = false
-resistors       = 0
-resistor_values =
-tolerance       = 1.0
+[resource]
+script = ExtResource("1")
+level_name = "Туториал: первая цепь"
+hint = "Соедините «+» и «−» батареи с лампой через провода."
+power_count = 1
+power_voltages = Array[float]([9.0])
+goal_count = 1
+goal_voltages = Array[float]([9.0])
+allow_wire = true
+allow_voltammeter = false
+allow_toggle = false
+allow_switch = false
+resistor_count = 0
+resistor_values = Array[float]([])
+voltage_tolerance = 1.0
 ```
 
-💡 *Хотите добавить свой уровень? Просто создайте новый `.txt` файл в `electro/resources/levels/` и всё!*
+💡 *Хотите добавить свой уровень?*
+
+1. В Godot: `resources/levels/` → `New Resource… ▶ LevelData` → заполните поля → сохраните как `06_xxx.tres`.
+2. Допишите одну строку `preload("res://resources/levels/06_xxx.tres"),` в массив `levels` в `electro/scripts/autoload/game_manager.gd`.
 
 ---
 

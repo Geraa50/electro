@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3 uid="uid://level_01_tutorial"]
+
+[ext_resource type="Script" uid="uid://bwkg8qmjc01yu" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Туториал: первая цепь"
+hint = "Соедините «+» и «−» батареи с лампой через провода. Когда нажмёте на батарею, она подаст напряжение. Чтобы пройти уровень, лампа должна получить нужное напряжение."
+power_count = 1
+power_voltages = Array[float]([9.0])
+goal_count = 1
+goal_voltages = Array[float]([9.0])
+allow_wire = true
+allow_voltammeter = false
+allow_toggle = false
+allow_switch = false
+resistor_count = 0
+resistor_values = Array[float]([])
+voltage_tolerance = 1.0

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3 uid="uid://level_03_measure"]
+
+[ext_resource type="Script" uid="uid://bwkg8qmjc01yu" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Уровень 3: измерения"
+hint = "Используйте вольт-ампер метр в последовательной цепи, чтобы измерить ток и напряжение на нагрузке. Подберите резистор так, чтобы лампа получила 5 В."
+power_count = 1
+power_voltages = Array[float]([10.0])
+goal_count = 1
+goal_voltages = Array[float]([5.0])
+allow_wire = true
+allow_voltammeter = true
+allow_toggle = false
+allow_switch = true
+resistor_count = 1
+resistor_values = Array[float]([10.0])
+voltage_tolerance = 0.5

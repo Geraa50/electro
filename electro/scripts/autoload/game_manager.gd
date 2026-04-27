@@ -3,39 +3,38 @@ extends Node
 signal level_completed(level_index: int)
 signal level_failed(level_index: int)
 
-const LEVELS_DIR := "res://resources/levels"
 const POWER_COOLDOWN := 5.0
+
+# Уровни описаны как нативные Godot-ресурсы (.tres) и подгружаются через
+# preload(). Это критично для портов на закрытые ОС (например, Аврора ОС):
+#   * preload запекает ресурсы в .pck во время компиляции скрипта — не нужен
+#     DirAccess/FileAccess для перечисления файлов внутри PCK;
+#   * .tres читается ResourceLoader-ом, а значит не требуется отдельных
+#     разрешений FS на чтение «сырых» файлов вроде .txt;
+#   * порядок уровней задаётся явно этим массивом, никаких сюрпризов с
+#     сортировкой имён файлов.
+var levels: Array[LevelData] = [
+	preload("res://resources/levels/01_tutorial.tres"),
+	preload("res://resources/levels/02_parallel.tres"),
+	preload("res://resources/levels/03_measure.tres"),
+	preload("res://resources/levels/04_toggle.tres"),
+	preload("res://resources/levels/05_double.tres"),
+]
 
 var current_level_index: int = -1
 var completed_levels: Array[int] = []
-var level_files: Array[String] = []
 
 var total_levels: int:
 	get:
-		return level_files.size()
+		return levels.size()
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_scan_levels()
 
-func _scan_levels() -> void:
-	level_files.clear()
-	var dir := DirAccess.open(LEVELS_DIR)
-	if dir == null:
-		return
-	dir.list_dir_begin()
-	var file := dir.get_next()
-	while file != "":
-		if not dir.current_is_dir() and file.ends_with(".txt"):
-			level_files.append(file)
-		file = dir.get_next()
-	dir.list_dir_end()
-	level_files.sort()
-
-func get_level_resource_path(level_index: int) -> String:
-	if level_index < 0 or level_index >= level_files.size():
-		return ""
-	return "%s/%s" % [LEVELS_DIR, level_files[level_index]]
+func get_level_data(level_index: int) -> LevelData:
+	if level_index < 0 or level_index >= levels.size():
+		return null
+	return levels[level_index]
 
 func start_level(level_index: int) -> void:
 	current_level_index = level_index

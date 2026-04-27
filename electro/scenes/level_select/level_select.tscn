@@ -20,45 +20,51 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.12, 0.14, 0.2, 1)
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="Root" type="VBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -280.0
-offset_right = 300.0
-offset_bottom = 280.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 12
+offset_left = 24.0
+offset_top = 20.0
+offset_right = -24.0
+offset_bottom = -20.0
+theme_override_constants/separation = 14
 
-[node name="Title" type="Label" parent="VBoxContainer"]
+[node name="Title" type="Label" parent="Root"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 36
 text = "ВЫБЕРИТЕ УРОВЕНЬ"
 horizontal_alignment = 1
 
-[node name="Spacer" type="Control" parent="VBoxContainer"]
+[node name="ScrollContainer" type="ScrollContainer" parent="Root"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 10)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
-[node name="LevelGrid" type="GridContainer" parent="VBoxContainer"]
+[node name="LevelGrid" type="GridContainer" parent="Root/ScrollContainer"]
 layout_mode = 2
-theme_override_constants/h_separation = 15
-theme_override_constants/v_separation = 15
-columns = 3
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 18
+theme_override_constants/v_separation = 18
+columns = 4
 
-[node name="Spacer2" type="Control" parent="VBoxContainer"]
+[node name="EmptyLabel" type="Label" parent="Root"]
+visible = false
 layout_mode = 2
-custom_minimum_size = Vector2(0, 20)
+theme_override_font_sizes/font_size = 18
+text = "Уровни не найдены."
+horizontal_alignment = 1
 
-[node name="BackButton" type="Button" parent="VBoxContainer"]
+[node name="BackButton" type="Button" parent="Root"]
 layout_mode = 2
-custom_minimum_size = Vector2(200, 50)
-theme_override_font_sizes/font_size = 20
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
 text = "← НАЗАД В МЕНЮ"
 
-[connection signal="pressed" from="VBoxContainer/BackButton" to="." method="_on_back_pressed"]
+[connection signal="pressed" from="Root/BackButton" to="." method="_on_back_pressed"]

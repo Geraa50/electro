@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3 uid="uid://level_02_parallel"]
+
+[ext_resource type="Script" uid="uid://bwkg8qmjc01yu" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Уровень 2: параллельное соединение"
+hint = "При параллельном соединении 1/R = 1/R1 + 1/R2. Общее сопротивление всегда меньше наименьшего из резисторов. Лампе нужно 12 В — значит, напряжение на параллельном блоке должно быть максимальным."
+power_count = 1
+power_voltages = Array[float]([12.0])
+goal_count = 1
+goal_voltages = Array[float]([12.0])
+allow_wire = true
+allow_voltammeter = true
+allow_toggle = false
+allow_switch = true
+resistor_count = 2
+resistor_values = Array[float]([20.0, 30.0])
+voltage_tolerance = 1.0

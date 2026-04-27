@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3 uid="uid://level_05_double"]
+
+[ext_resource type="Script" uid="uid://bwkg8qmjc01yu" path="res://scripts/level/level_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_name = "Уровень 5: два источника"
+hint = "Два источника могут питать одну цепь последовательно (складывая напряжения) или параллельно (распределяя ток). Соберите схему так, чтобы обе лампы горели в штатном режиме."
+power_count = 2
+power_voltages = Array[float]([6.0, 6.0])
+goal_count = 2
+goal_voltages = Array[float]([12.0, 12.0])
+allow_wire = true
+allow_voltammeter = true
+allow_toggle = false
+allow_switch = true
+resistor_count = 3
+resistor_values = Array[float]([10.0, 20.0, 20.0])
+voltage_tolerance = 1.0
